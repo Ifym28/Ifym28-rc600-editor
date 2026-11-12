@@ -63,6 +63,14 @@ async function storeTrack(track, left, right, what) {
   }, ({ frames, measures }) => `${what} → track ${track}: ${(frames / RATE).toFixed(2)} s, ${measures} measure${measures > 1 ? 's' : ''}. Memory written.`);
 }
 
+/** Used by other views: put a rendered loop on a track of the current memory, after a confirm if it is in use. */
+export async function putLoop(track, left, right, what) {
+  if (S.device.waveDirs.has(rc.waveDir(S.slot, track))
+    && !(await confirm(`Replace track ${track}`, `Track ${track} of memory ${S.slot} already holds a loop. The old WAV is moved to the app trash folder and replaced.`, 'Replace', 'warn'))) return false;
+  await storeTrack(track, left, right, what);
+  return true;
+}
+
 async function overwriteOk(track) {
   if (!ui.files?.[track - 1]) return true;
   return confirm(`Replace track ${track}`, `Track ${track} of memory ${S.slot} already holds a loop. The old WAV is moved to the app trash folder and replaced.`, 'Replace', 'warn');

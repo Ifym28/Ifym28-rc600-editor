@@ -5,6 +5,8 @@
 
 import { encodeRcWav, RATE } from './wav.js';
 import { memoryFile, waveDir, waveFile } from './rc0.js';
+import { encodeRecord, writeRhythmFile } from './rhythm-file.js';
+import { PRESETS } from './rhythm-presets.js';
 
 export const join = (...parts) => parts.join('/').replace(/\/+/g, '/');
 
@@ -145,6 +147,7 @@ function buildDemoFiles() {
     });
   }
   const sys = demoSystem();
+  files.set('DATA/RHYTHM.RC0', writeRhythmFile(PRESETS.slice(0, 3).map(encodeRecord)));
   files.set('DATA/SYSTEM1.RC0', textToBytes(sys));
   files.set('DATA/SYSTEM2.RC0', textToBytes(sys.replace('<count>0001', '<count>0000')));
   return files;
@@ -198,6 +201,7 @@ export function demoBackend() {
       return true;
     },
     mkdir: async () => true,
+    snapshot: async () => true,
     async remove(p) {
       const key = rel(p);
       let hit = false;

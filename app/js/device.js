@@ -4,6 +4,7 @@ import * as rc from './rc0.js';
 import { join, bytesToText, textToBytes } from './backend.js';
 import { TRACK_AUDIO_TAGS, samplesPerMeasure, beatsFromRhythm } from './params.js';
 import { encodeRcWav } from './wav.js';
+import { readRhythmFile, writeRhythmFile } from './rhythm-file.js';
 
 const COUNT_RE = /<count>([0-9A-Fa-f]+)<\/count>/;
 
@@ -61,6 +62,7 @@ export class Device {
       onProgress?.(++done);
     });
     this.systemState = await this.pairState('SYSTEM1.RC0', 'SYSTEM2.RC0', present);
+    this.hasRhythmFile = present.has('RHYTHM.RC0');
     const waveDirs = await this.backend.list(join(this.root, 'WAVE')).catch(() => []);
     this.waveDirs = new Set(waveDirs.filter((e) => e.dir).map((e) => e.name));
     this.waveCount = this.waveDirs.size;
@@ -105,6 +107,23 @@ export class Device {
     s.counts[target] = next;
     s.current = target;
     return rc.parseRc0(text);
+  }
+
+  // ------------------------------------------------------------- user rhythms
+
+  /** Records of DATA/RHYTHM.RC0 as raw bytes. A missing file gives an empty list. */
+  async loadRhythms() {
+    if (!this.hasRhythmFile) return [];
+    return readRhythmFile(await this.backend.read(this.dataPath('RHYTHM.RC0')));
+  }
+
+  /** Replace DATA/RHYTHM.RC0. The previous file is first copied to the app trash folder. */
+  async saveRhythms(records) {
+    const bytes = writeRhythmFile(records);
+    readRhythmFile(bytes);
+    if (this.hasRhythmFile) await this.backend.snapshot(this.dataPath('RHYTHM.RC0'));
+    await this.backend.write(this.dataPath('RHYTHM.RC0'), bytes);
+    this.hasRhythmFile = true;
   }
 
   // ------------------------------------------------------------- audio

@@ -99,20 +99,69 @@ export function position(key) {
 }
 
 // ---- drum voices for the rhythm editor ----
+// General MIDI drum notes. The preview is a simple synth, not the sound of the looper kits.
 
-export const DRUMS = [
-  { id: 'kick', name: 'High Bass Drum', note: 36 },
-  { id: 'snare', name: 'Acoustic Snare', note: 38 },
-  { id: 'stick', name: 'Side Stick', note: 37 },
-  { id: 'clap', name: 'Hand Clap', note: 39 },
-  { id: 'chh', name: 'Closed Hi-hat', note: 42 },
-  { id: 'ohh', name: 'Open Hi-hat', note: 46 },
-  { id: 'tomL', name: 'Low Tom', note: 45 },
-  { id: 'tomH', name: 'High Tom', note: 50 },
-  { id: 'ride', name: 'Ride Cymbal', note: 51 },
-  { id: 'crash', name: 'Crash Cymbal', note: 49 },
-  { id: 'cow', name: 'Cowbell', note: 56 },
-];
+export const DRUM_NOTES = [
+  [49, 'Crash', 'crash'], [57, 'Crash 2', 'crash'], [55, 'Splash', 'crash'], [52, 'China', 'crash'],
+  [51, 'Ride', 'ride'], [53, 'Ride Bell', 'ride'], [59, 'Ride 2', 'ride'],
+  [46, 'Open Hat', 'ohh'], [42, 'Closed Hat', 'chh'], [44, 'Pedal Hat', 'chh'],
+  [54, 'Tambourine', 'chh'], [56, 'Cowbell', 'cow'],
+  [50, 'High Tom', 'tomH'], [48, 'High Tom 2', 'tomH'], [47, 'Mid Tom', 'tomH'], [45, 'Mid Tom 2', 'tomL'],
+  [43, 'Low Tom', 'tomL'], [41, 'Low Tom 2', 'tomL'],
+  [39, 'Clap', 'clap'], [37, 'Rim', 'stick'], [40, 'Snare 2', 'snare'], [38, 'Snare', 'snare'],
+  [36, 'Kick', 'kick'], [35, 'Kick 2', 'kick'],
+].map(([note, name, voice]) => ({ note, name, voice }));
+
+export const drumName = (note) => DRUM_NOTES.find((d) => d.note === note)?.name || `Note ${note}`;
+
+// Own samples, one per drum note: { name, left, right } at 44.1 kHz. A note with a
+// sample plays the sample; a note without one plays the synth voice.
+const samples = new Map();
+export const getSample = (note) => samples.get(note) || null;
+export function setSample(note, sample) {
+  if (sample) samples.set(note, sample);
+  else samples.delete(note);
+}
+
+/** Play a MIDI drum note on a context (the live one by default). velocity is 1..127. */
+export function drumNote(note, when, velocity = 100, ac = audioContext()) {
+  const s = samples.get(note);
+  if (!s) return drumHit(DRUM_NOTES.find((d) => d.note === note)?.voice || 'stick', when, Math.min(1, velocity / 115), ac);
+  const buf = ac.createBuffer(2, s.left.length, RATE);
+  buf.copyToChannel(s.left, 0);
+  buf.copyToChannel(s.right, 1);
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  const gain = ac.createGain();
+  gain.gain.value = (velocity / 127) ** 1.5;
+  src.connect(gain).connect(ac.destination);
+  src.start(when);
+}
+
+/**
+ * Render measures of drum notes to a stereo loop. The ring-out after the last
+ * measure is mixed back into the start, so the loop repeats without a gap.
+ */
+export async function renderDrumLoop(measures, measureTicks, tempo) {
+  const secPerTick = 60 / tempo / 96;
+  const frames = Math.round(measures.length * measureTicks * secPerTick * RATE);
+  const tail = RATE * 4;
+  const off = new OfflineAudioContext(2, frames + tail, RATE);
+  measures.forEach((notes, m) => {
+    for (const n of notes) drumNote(n.note, (m * measureTicks + n.tick) * secPerTick, n.velocity, off);
+  });
+  const done = await off.startRendering();
+  const out = [0, 1].map((c) => {
+    const all = done.getChannelData(c);
+    const loop = all.slice(0, frames);
+    for (let i = frames; i < all.length; i++) loop[(i - frames) % frames] += all[i];
+    return loop;
+  });
+  let peak = 0;
+  for (const ch of out) for (let i = 0; i < ch.length; i++) peak = Math.max(peak, Math.abs(ch[i]));
+  if (peak > 0.98) for (const ch of out) for (let i = 0; i < ch.length; i++) ch[i] *= 0.98 / peak;
+  return { left: out[0], right: out[1], peak };
+}
 
 let noise = null;
 function noiseBuffer(ac) {
@@ -123,8 +172,7 @@ function noiseBuffer(ac) {
   return noise;
 }
 
-export function drumHit(id, when, velocity = 0.8) {
-  const ac = audioContext();
+export function drumHit(id, when, velocity = 0.8, ac = audioContext()) {
   const out = ac.createGain();
   out.gain.value = velocity;
   out.connect(ac.destination);

@@ -130,6 +130,16 @@ const handlers = {
     return true;
   },
 
+  // Keep a copy of a file in the app trash folder before it is replaced.
+  async snapshot(p) {
+    const full = check(p);
+    if (!(await exists(full))) return false;
+    const dest = path.join(trashHome(), stamp(), path.basename(full));
+    await fs.mkdir(path.dirname(dest), { recursive: true });
+    await fs.copyFile(full, dest);
+    return true;
+  },
+
   async backup(root, opts = {}) {
     const src = check(root);
     const dest = path.join(backupHome(), `RC-600 ${stamp()}`, 'ROLAND');

@@ -5,7 +5,7 @@ import * as rc from '../app/js/rc0.js';
 import { demoBackend, bytesToText, textToBytes } from '../app/js/backend.js';
 import { Device } from '../app/js/device.js';
 import { decodeWav, encodeRcWav, encodePcm16, wavInfo, mixTracks, resampleLinear } from '../app/js/wav.js';
-import { patternToSmf } from '../app/js/smf.js';
+import { measuresToSmf } from '../app/js/smf.js';
 
 // The same shape as a file from the unit: tabs, digit and "#" tags, <count> after the root.
 const SAMPLE = `<?xml version="1.0" encoding="utf-8"?>
@@ -91,7 +91,7 @@ test('wav: looper format header and decode', () => {
 });
 
 test('smf: header and track length', () => {
-  const bytes = patternToSmf({ bpm: 120, beats: 4, steps: 16, lanes: [{ note: 36, velocity: 100, cells: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0] }] });
+  const bytes = measuresToSmf({ tempo: 120, measures: [[0, 96, 192, 288, 380].map((tick) => ({ tick, note: 36, velocity: 100 }))] });
   assert.equal(bytesToText(bytes.subarray(0, 4)), 'MThd');
   assert.equal(bytesToText(bytes.subarray(14, 18)), 'MTrk');
   const len = new DataView(bytes.buffer).getUint32(18);
@@ -180,4 +180,30 @@ test('rhythm file: record round trip and file layout', async () => {
   assert.equal(new DataView(file.buffer).getUint32(8, true), RECORD_SIZE);
   assert.deepEqual(readRhythmFile(file), [rec]);
   assert.throws(() => encodeRecord({ name: 'X', kit: 0, tempo: 120, parts: [[measure]] }), /10 parts/);
+});
+
+test('rhythm presets encode and survive a decode', async () => {
+  const { PRESETS } = await import('../app/js/rhythm-presets.js');
+  const { encodeRecord, decodeRecord } = await import('../app/js/rhythm-file.js');
+  assert.equal(PRESETS.length, 6);
+  for (const p of PRESETS) {
+    const d = decodeRecord(encodeRecord(p));
+    assert.equal(d.name, p.name);
+    assert.equal(d.notes.length, p.parts.flat(2).length);
+    assert.equal(d.endTick, p.parts.flat().length * 384);
+  }
+});
+
+test('device: user rhythms are read and replaced as a whole file', async () => {
+  const { encodeRecord, decodeRecord } = await import('../app/js/rhythm-file.js');
+  const { PRESETS } = await import('../app/js/rhythm-presets.js');
+  const backend = demoBackend();
+  const dev = new Device(backend, (await backend.findVolumes())[0]);
+  await dev.scan();
+  const records = await dev.loadRhythms();
+  assert.deepEqual(records.map((r) => decodeRecord(r).name), ['TRAP ATLANTA', 'TRAP DRILL', 'TRAP DARK']);
+  await dev.saveRhythms([records[0], encodeRecord(PRESETS[5])]);
+  const again = await dev.loadRhythms();
+  assert.deepEqual(again.map((r) => decodeRecord(r).name), ['TRAP ATLANTA', 'TRAP SOUL']);
+  assert.deepEqual(again[0], records[0]);
 });

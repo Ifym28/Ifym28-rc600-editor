@@ -20,6 +20,8 @@ export const S = {
   busy: 0,
   followMidi: true,
   lastBackup: null,
+  // Other editors with unwritten work: { label, dirty(), write(), discard() }
+  pending: [],
   render: () => {},
   refreshChrome: () => {},
 };
@@ -90,10 +92,16 @@ export async function disconnectVolume(eject) {
   await refreshVolumes();
 }
 
-/** Ask what to do with pending edits. Returns false when the user cancels. */
-export async function leaveCheck() {
-  if (!dirty() && !sysDirty()) return true;
-  const what = [dirty() && `memory ${S.slot}`, sysDirty() && 'system settings'].filter(Boolean).join(' and ');
+/**
+ * Ask what to do with pending edits. Returns false when the user cancels.
+ * scope "memory" looks only at the current memory, "all" at everything.
+ */
+export async function leaveCheck(scope = 'all') {
+  const all = scope === 'all';
+  const sys = all && sysDirty();
+  const extra = all ? S.pending.filter((p) => p.dirty()) : [];
+  if (!dirty() && !sys && !extra.length) return true;
+  const what = [dirty() && `memory ${S.slot}`, sys && 'system settings', ...extra.map((p) => p.label)].filter(Boolean).join(' and ');
   const choice = await dialog({
     title: 'Unwritten changes',
     body: `There are changes to ${what} that are not written to the looper yet.`,
@@ -102,10 +110,12 @@ export async function leaveCheck() {
   if (!choice) return false;
   if (choice === 'write') {
     if (dirty()) await writeMemory();
-    if (sysDirty()) await writeSystem();
+    if (sys) await writeSystem();
+    for (const p of extra) await p.write();
   } else {
     if (S.doc) rc.revert(S.doc);
-    if (S.sysDoc) rc.revert(S.sysDoc);
+    if (sys) rc.revert(S.sysDoc);
+    for (const p of extra) p.discard();
   }
   return true;
 }
@@ -113,13 +123,7 @@ export async function leaveCheck() {
 export async function selectSlot(slot, { ask = true } = {}) {
   if (!S.device || slot === S.slot) return;
   if (!mem(slot)) return void toast(`Memory ${slot} has no file on this volume.`, true);
-  if (ask && dirty()) {
-    const keepSys = S.sysDoc;
-    S.sysDoc = null; // only the memory matters here
-    const ok = await leaveCheck();
-    S.sysDoc = keepSys;
-    if (!ok) return;
-  }
+  if (ask && !(await leaveCheck('memory'))) return;
   audio.stopAll();
   await run(async () => {
     S.doc = await S.device.loadMemory(slot);

@@ -49,7 +49,7 @@ Program Change so the looper follows, and the Overview has Start and Stop.
 | Overview | All 99 memories in one matrix, with name, loops per track and tempo. |
 | Memory Editor | Track settings (level, pan, reverse, 1-shot, FX, start, stop and dub mode, sync, inputs), Rec and Play, rhythm, assigns, input, output, mixer, EQ, pedals. |
 | Input FX / Track FX | Banks A to D, four slots each, with the stored parameters of each effect type. |
-| Rhythm | Rhythm settings of the memory, and a step pattern composer with preview and `.mid` export. |
+| Rhythm | Editor for the user rhythms on the looper (`RHYTHM.RC0`): name, kit, tempo, ten parts, every hit with its drum sound and velocity, on a 1/16, 1/32 or triplet grid. Six trap presets. Own samples per drum sound for the preview, and render of a part as a loop onto a track. Rhythm settings and rhythm level of the memory. |
 | System | Global settings from `SYSTEM1/2.RC0`. |
 | Audio | Per track: waveform, play, import, export, copy, paste, delete. Play all with track levels. Bounce selected tracks to a file or to a track. |
 | Setlists | Ordered lists of memories with notes, stored in the app. |
@@ -84,8 +84,12 @@ Parameter Guide and the mapping work of the community.
   and raw number, so nothing is hidden. Every control shows its tag letter.
 - Assign sources and targets, and effect parameters, are raw numbers in the
   order of the Parameter Guide.
-- The step composer exports a Standard MIDI File. The looper loads user rhythms
-  through the BOSS RC Rhythm Converter, which reads that file.
+- The drum kits inside the looper are part of its firmware. They cannot be
+  edited or replaced from the storage. The editor chooses the kit and edits the
+  patterns. Own samples are played by the editor and rendered to a loop track.
+- User rhythms are written straight to `RHYTHM.RC0`. The writer reproduces a
+  record written by a real unit byte for byte, but it is not yet tested on one.
+  A memory selects a user rhythm with genre "User"; that value is an assumption.
 - BOSS Tone Studio stays the official way to import audio. The direct import
   here writes the WAV and the track length tags itself.
 

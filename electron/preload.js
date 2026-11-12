@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 const names = [
-  'findVolumes', 'pickFolder', 'list', 'read', 'write', 'mkdir', 'remove',
+  'findVolumes', 'pickFolder', 'list', 'read', 'write', 'mkdir', 'remove', 'snapshot',
   'backup', 'pickBackup', 'restore', 'saveFile', 'openFile', 'eject', 'reveal',
 ];
 
