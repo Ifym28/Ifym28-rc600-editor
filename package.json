@@ -1,0 +1,28 @@
+{
+  "name": "rc600-editor",
+  "productName": "RC-600 Editor",
+  "version": "0.1.0",
+  "description": "macOS editor for the BOSS RC-600 Loop Station: memories, loops, rhythm, setlists and backup.",
+  "main": "electron/main.js",
+  "license": "Apache-2.0",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "demo": "python3 -m http.server 5600 --directory app",
+    "test": "node --test test/*.test.mjs",
+    "dist": "electron-builder --mac"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "local.rc600.editor",
+    "files": ["electron/**", "app/**", "package.json"],
+    "mac": {
+      "category": "public.app-category.music",
+      "identity": "-",
+      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }]
+    }
+  }
+}
