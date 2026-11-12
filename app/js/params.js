@@ -17,9 +17,11 @@ const range = (from, to, label = (n) => String(n), offset = 0) => {
 };
 
 const FADE = [...en('1/32', '1/16', '1/8', '1/4'), ...range(1, 64, (n) => `${n} MEAS`, 3)];
-const BEATS = [...range(2, 7, (n) => `${n}/4`), ...range(5, 15, (n) => `${n}/8`, 3)];
+// Stored as the position in this list: 0 = 2/4, 2 = 4/4, 6 = 5/8.
+const BEATS = en('2/4', '3/4', '4/4', '5/4', '6/4', '7/4', '5/8', '6/8', '7/8', '8/8', '9/8', '10/8', '11/8', '12/8', '13/8', '14/8', '15/8');
 const MIDI_CH = range(1, 16, (n) => `CH ${n}`, -1);
 const INPUT_BITS = ['MIC 1', 'MIC 2', 'INST 1 L', 'INST 1 R', 'INST 2 L', 'INST 2 R', 'RHYTHM'];
+const OUTS = ['MAIN L', 'MAIN R', 'SUB 1 L', 'SUB 1 R', 'SUB 2 L', 'SUB 2 R', 'PHONES'];
 const TRACK_BITS = ['TRACK 1', 'TRACK 2', 'TRACK 3', 'TRACK 4', 'TRACK 5', 'TRACK 6'];
 
 export const TRACK = {
@@ -32,12 +34,14 @@ export const TRACK = {
   G: { name: 'Dub Mode', kind: 'enum', options: en('OVERDUB', 'REPLACE 1', 'REPLACE 2') },
   H: { name: 'FX', kind: 'bool' },
   I: { name: 'Play Mode', kind: 'enum', options: en('MULTI', 'SINGLE') },
+  J: { name: 'Measure (0 AUTO, 1 FREE)', kind: 'int', min: 0, max: 99999 },
   L: { name: 'Loop Sync', kind: 'bool' },
   M: { name: 'Tempo Sync', kind: 'bool' },
   N: { name: 'Tempo Sync Mode', kind: 'enum', options: en('PITCH', 'XFADE') },
   O: { name: 'Tempo Sync Speed', kind: 'enum', options: en('HALF', 'NORMAL', 'DOUBLE') },
   P: { name: 'Bounce In', kind: 'bool' },
   Q: { name: 'Input', kind: 'bits', bits: INPUT_BITS },
+  S: { name: 'Measures Recorded', kind: 'int', min: 0, max: 99999, audio: true },
   U: { name: 'Recorded Tempo', kind: 'int', min: 400, max: 3000, fmt: 'tempo', audio: true },
   V: { name: 'Samples per Measure', kind: 'int', min: 0, max: 99999999, audio: true },
   X: { name: 'Length (samples)', kind: 'int', min: 0, max: 999999999, audio: true },
@@ -68,28 +72,25 @@ export const SECTIONS = {
     F: { name: 'Bounce Tracks', kind: 'bits', bits: TRACK_BITS },
   },
   PLAY: {
-    A: { name: 'Single Track Change', kind: 'enum', options: en('IMMEDIATE', 'LOOP END') },
     B: { name: 'Fade Time In', kind: 'enum', options: FADE },
     C: { name: 'Fade Time Out', kind: 'enum', options: FADE },
     D: { name: 'All Start Tracks', kind: 'bits', bits: TRACK_BITS },
     E: { name: 'All Stop Tracks', kind: 'bits', bits: TRACK_BITS },
     F: { name: 'Loop Length (0 = AUTO)', kind: 'int', min: 0, max: 25362 },
-    G: { name: 'Speed Change', kind: 'enum', options: en('IMMEDIATE', 'LOOP END') },
-    H: { name: 'Sync Adjust', kind: 'enum', options: en('MEASURE', 'BEAT') },
   },
   RHYTHM: {
     A: { name: 'Genre', kind: 'enum', options: en(...GENRES) },
     B: { name: 'Pattern', kind: 'pattern' },
     C: { name: 'Variation', kind: 'enum', options: en('A', 'B', 'C', 'D') },
-    D: { name: 'Kit', kind: 'enum', options: en(...KITS) },
-    E: { name: 'Beat', kind: 'enum', options: BEATS },
-    F: { name: 'Start Trigger', kind: 'enum', options: en('LOOP START', 'REC END', 'BEFORE LOOP') },
-    G: { name: 'Stop Trigger', kind: 'enum', options: en('OFF', 'LOOP STOP', 'REC END') },
+    D: { name: 'Variation Change', kind: 'enum', options: en('MEASURE', 'LOOP END') },
+    E: { name: 'Kit', kind: 'enum', options: en(...KITS) },
+    F: { name: 'Beat', kind: 'enum', options: BEATS },
+    G: { name: 'Fill', kind: 'bool' },
     H: { name: 'Intro on Rec', kind: 'bool' },
     I: { name: 'Intro on Play', kind: 'bool' },
     J: { name: 'Ending', kind: 'bool' },
-    K: { name: 'Fill', kind: 'bool' },
-    L: { name: 'Variation Change', kind: 'enum', options: en('MEASURE', 'LOOP END') },
+    K: { name: 'Start Trigger', kind: 'enum', options: en('LOOP START', 'REC END', 'BEFORE LOOP') },
+    L: { name: 'Stop Trigger', kind: 'enum', options: en('OFF', 'LOOP STOP', 'REC END') },
   },
   INPUT: {
     A: { name: 'MIC 1 Phantom', kind: 'bool' },
@@ -113,11 +114,16 @@ export const SECTIONS = {
     D: { name: 'SUB 2 Stereo Link', kind: 'bool' },
   },
   ROUTING: {
-    O: { name: 'Phones Out', kind: 'int', min: 0, max: 7 },
-    P: { name: 'Input Thru', kind: 'bool' },
-    Q: { name: 'Rhythm Out', kind: 'int', min: 0, max: 7 },
-    S: { name: 'Phones Rhythm', kind: 'bool' },
+    ...Object.fromEntries(OUTS.map((o, i) => ['ABCDEFG'[i], { name: `Tracks to ${o}`, kind: 'bits', bits: TRACK_BITS }])),
+    ...Object.fromEntries(OUTS.map((o, i) => ['HIJKLMN'[i], { name: `Inputs to ${o}`, kind: 'bits', bits: INPUT_BITS }])),
   },
+  MIXER: Object.fromEntries([
+    ...['MIC 1', 'MIC 2', 'INST 1 L', 'INST 1 R', 'INST 2 L', 'INST 2 R'].flatMap((n, i) => [
+      ['ABCDEFGHIJKL'[2 * i], { name: `${n} Level`, kind: 'int', min: 0, max: 200 }],
+      ['ABCDEFGHIJKL'[2 * i + 1], { name: `${n} Mute`, kind: 'bool' }],
+    ]),
+    ...[...OUTS.slice(0, 6), 'Loop', 'Rhythm', 'Phones', 'Master'].map((n, i) => ['MNOPQRSTUV'[i], { name: `${n} Level`, kind: 'int', min: 0, max: 200 }]),
+  ]),
   MASTER_FX: {
     A: { name: 'Comp', kind: 'int', min: 0, max: 40 },
     B: { name: 'Reverb', kind: 'int', min: 0, max: 40 },
@@ -126,12 +132,14 @@ export const SECTIONS = {
   ASSIGN: {
     A: { name: 'Switch', kind: 'bool' },
     B: { name: 'Source', kind: 'int', min: 0, max: 255 },
-    C: { name: 'Source Mode', kind: 'enum', options: en('MOMENT', 'TOGGLE') },
-    D: { name: 'Act Low', kind: 'int', min: 0, max: 127 },
+    E: { name: 'Act Low', kind: 'int', min: 0, max: 127 },
     F: { name: 'Act High', kind: 'int', min: 0, max: 127 },
     G: { name: 'Target', kind: 'int', min: 0, max: 2047 },
-    H: { name: 'Target Min', kind: 'int', min: 0, max: 127 },
-    I: { name: 'Target Max', kind: 'int', min: 0, max: 127 },
+    I: { name: 'Target Min', kind: 'int', min: 0, max: 200 },
+    J: { name: 'Target Max', kind: 'int', min: 0, max: 200 },
+  },
+  PEDAL: {
+    A: { name: 'Function', kind: 'int', min: 0, max: 216 },
   },
   FX_BANK: {
     A: { name: 'Switch', kind: 'bool' },
@@ -142,7 +150,7 @@ export const SECTIONS = {
     A: { name: 'Switch', kind: 'bool' },
     B: { name: 'Switch Mode', kind: 'enum', options: en('TOGGLE', 'MOMENT') },
     C: { name: 'Type', kind: 'fxtype' },
-    D: { name: 'Insert', kind: 'int', min: 0, max: 15 },
+    D: { name: 'Insert (0 = ALL)', kind: 'int', min: 0, max: 6 },
   },
   // system file
   USB: {
@@ -187,6 +195,7 @@ export function defsFor(sectionName) {
   if (/^TRACK\d$/.test(sectionName)) return TRACK;
   if (/^ASSIGN\d+$/.test(sectionName)) return SECTIONS.ASSIGN;
   if (/^EQ_/.test(sectionName)) return EQ;
+  if (/^ICTL\d_PEDAL\d$/.test(sectionName)) return SECTIONS.PEDAL;
   if (/^[A-D]$/.test(sectionName)) return SECTIONS.FX_BANK;
   if (/^[A-D][A-D]$/.test(sectionName)) return SECTIONS.FX_SLOT;
   return SECTIONS[sectionName] || {};
@@ -209,9 +218,9 @@ export function formatValue(def, value) {
 /** Samples in one measure at a tempo (bpm) and a number of beats per measure. */
 export const samplesPerMeasure = (bpm, beats = 4) => Math.round((44100 * 60 * beats) / bpm);
 
-/** Beats per measure from the RHYTHM "Beat" value (2..7 = n/4, 8..18 = (n-3)/8 counted in quarter notes). */
+/** Quarter notes per measure from the RHYTHM "Beat" value (0..5 = 2/4..7/4, 6..16 = 5/8..15/8). */
 export function beatsFromRhythm(value) {
-  if (value >= 2 && value <= 7) return value;
-  if (value >= 8 && value <= 18) return (value - 3) / 2;
+  if (value >= 0 && value <= 5) return value + 2;
+  if (value >= 6 && value <= 16) return (value - 1) / 2;
   return 4;
 }

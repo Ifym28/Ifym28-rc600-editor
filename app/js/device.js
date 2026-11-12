@@ -139,7 +139,7 @@ export class Device {
 
     const frames = Math.min(left.length, right.length);
     const tempo10 = rc.getNum(rc.section(doc, 'mem', 'MASTER'), 'A', 1200);
-    const beats = beatsFromRhythm(rc.getNum(rc.section(doc, 'mem', 'RHYTHM'), 'E', 4));
+    const beats = beatsFromRhythm(rc.getNum(rc.section(doc, 'mem', 'RHYTHM'), 'F', 2));
     const measures = Math.max(1, Math.round(frames / samplesPerMeasure(tempo10 / 10, beats)));
     const sec = rc.section(doc, 'mem', `TRACK${track}`);
     rc.setNum(sec, 'U', tempo10);

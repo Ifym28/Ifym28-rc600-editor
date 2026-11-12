@@ -162,3 +162,22 @@ test('device: scan, save with A/B rotation, audio, copy and swap', async () => {
   assert.equal(rc.getNum(rc.section(await dev.loadSystem(), 'sys', 'USB'), 'D'), 150);
   assert.equal(textToBytes('abc').length, 3);
 });
+
+test('rhythm file: record round trip and file layout', async () => {
+  const { encodeRecord, decodeRecord, writeRhythmFile, readRhythmFile, RECORD_SIZE } = await import('../app/js/rhythm-file.js');
+  const measure = [{ tick: 0, note: 36, velocity: 110 }, { tick: 192, note: 38, velocity: 100 }, { tick: 192, note: 42, velocity: 80 }];
+  const rec = encodeRecord({ name: 'Trap Test', kit: 15, tempo: 140, parts: Array.from({ length: 10 }, (_, i) => (i === 1 ? [measure, measure] : [measure])) });
+  assert.equal(rec.length, RECORD_SIZE);
+  assert.equal(bytesToText(rec.subarray(0, 9)), 'TRAP^TEST');
+  const d = decodeRecord(rec);
+  assert.deepEqual([d.name, d.kit, d.tempo, d.beats, d.unit, d.notes.length, d.endTick], ['TRAP TEST', 15, 140, 4, 4, 33, 11 * 384]);
+  assert.deepEqual(d.parts.slice(0, 3), [{ from: 0, measures: 1 }, { from: 1, measures: 2 }, { from: 3, measures: 1 }]);
+  // Entry count includes the end marker; notes on the same tick are in rising note order.
+  assert.equal(new DataView(rec.buffer).getUint16(36, true), 34);
+  assert.deepEqual([...rec.subarray(184 + 4, 184 + 12)], [192, 0, 38, 100, 0, 0, 42, 80]);
+  const file = writeRhythmFile([rec]);
+  assert.equal(file.length, 12 + 50 * RECORD_SIZE);
+  assert.equal(new DataView(file.buffer).getUint32(8, true), RECORD_SIZE);
+  assert.deepEqual(readRhythmFile(file), [rec]);
+  assert.throws(() => encodeRecord({ name: 'X', kit: 0, tempo: 120, parts: [[measure]] }), /10 parts/);
+});

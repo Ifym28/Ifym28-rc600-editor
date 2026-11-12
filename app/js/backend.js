@@ -64,7 +64,7 @@ function demoMemory(slot, name, tracks, tempo, genre) {
   out += sec('MASTER', [tempo * 10, spm, 0, 0]);
   out += sec('REC', [0, 0, 0, 50, 0, 63]);
   out += sec('PLAY', [0, 5, 5, 63, 63, 0, 0, 1]);
-  out += sec('RHYTHM', [genre, 0, 0, 0, 4, 0, 1, 0, 0, 1, 0, 1, 1]);
+  out += sec('RHYTHM', [genre, 0, 0, 0, 4, 2, 1, 0, 0, 1, 0, 1, 1]);
   for (let a = 1; a <= 16; a++) out += sec(`ASSIGN${a}`, [a <= 2 ? 1 : 0, a <= 2 ? 48 + a : 0, 0, 0, 0, 127, a <= 2 ? 770 + a : 0, 0, 127, 1]);
   out += sec('INPUT', [0, 0, 0, 0, 0, 1, 1, 0, 40, 0, 40, 40, 40]);
   out += sec('OUTPUT', [0, 1, 1, 1]);

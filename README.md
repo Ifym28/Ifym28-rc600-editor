@@ -100,6 +100,7 @@ npm test           # unit tests: file format, WAV, MIDI file, device operations
 | `electron/` | Main process. File access is limited to folders the user connected. |
 | `app/js/rc0.js` | Reader and writer for `.RC0` files. |
 | `app/js/device.js` | Scan, A/B save, loops, copy and swap. |
+| `app/js/rhythm-file.js` | Reader and writer for the user rhythm file `RHYTHM.RC0`. |
 | `app/js/params.js` | Names for the lettered tags. |
 | `app/js/view-*.js`, `app.js` | The interface. |
 | `app/css/mecha.css` | The theme. |
