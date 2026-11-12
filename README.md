@@ -16,6 +16,10 @@ npm install
 npm start          # opens the app
 ```
 
+If `npm start` reports "Electron failed to install correctly", the Electron
+download did not complete during `npm install`. `npm start` now fetches it
+again by itself. To do it by hand: `node node_modules/electron/install.js`.
+
 To build a normal macOS app (`dist/RC-600 Editor-*.dmg`, Apple Silicon and Intel):
 
 ```sh

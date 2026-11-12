@@ -7,9 +7,11 @@
   "license": "Apache-2.0",
   "private": true,
   "scripts": {
+    "prestart": "node tools/ensure-electron.js",
     "start": "electron .",
     "demo": "python3 -m http.server 5600 --directory app",
     "test": "node --test test/*.test.mjs",
+    "predist": "node tools/ensure-electron.js",
     "dist": "electron-builder --mac"
   },
   "devDependencies": {
