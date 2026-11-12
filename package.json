@@ -21,9 +21,10 @@
   "build": {
     "appId": "local.rc600.editor",
     "files": ["electron/**", "app/**", "package.json"],
+    "afterPack": "tools/after-pack.js",
     "mac": {
       "category": "public.app-category.music",
-      "identity": "-",
+      "identity": null,
       "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }]
     }
   }

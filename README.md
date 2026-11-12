@@ -26,7 +26,8 @@ To build a normal macOS app (`dist/RC-600 Editor-*.dmg`, Apple Silicon and Intel
 npm run dist
 ```
 
-The app has no Apple developer certificate (it is signed ad hoc). The first time,
+The app has no Apple developer certificate. The build signs it ad hoc, which
+Apple Silicon needs before it will run the app at all. The first time,
 macOS blocks it: open System Settings > Privacy & Security and press **Open Anyway**.
 
 The repository also has a GitHub Actions workflow, "RC-600 Editor (macOS build)".
