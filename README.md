@@ -16,10 +16,11 @@ npm install
 npm start          # opens the app
 ```
 
-If `npm start` reports "Electron failed to install correctly", the Electron
-download did not complete during `npm install`. `npm start` now fetches it
-again by itself. A common cause is `ELECTRON_SKIP_BINARY_DOWNLOAD` set in the
-shell profile: it makes Electron skip its download without an error.
+Newer npm versions block install scripts until you approve them, so Electron's
+download does not run during `npm install`. `npm start` handles this: it
+downloads Electron itself (first with Electron's installer, then directly from
+GitHub with a SHA-256 check). To approve the script the npm way instead:
+`npm install-scripts approve electron`.
 
 To build a normal macOS app (`dist/RC-600 Editor-*.dmg`, Apple Silicon and Intel):
 

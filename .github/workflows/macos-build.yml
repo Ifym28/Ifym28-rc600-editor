@@ -17,6 +17,14 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm test
+      - name: Check the Electron download fallback (installer skipped, as with npm's script approval)
+        run: |
+          cp node_modules/electron/install.js /tmp/install.js.bak
+          echo 'process.exit(0)' > node_modules/electron/install.js
+          rm -rf node_modules/electron/dist node_modules/electron/path.txt
+          node tools/ensure-electron.js
+          cp /tmp/install.js.bak node_modules/electron/install.js
+          "node_modules/electron/dist/$(cat node_modules/electron/path.txt)" --version
       - run: npm run dist -- --publish never
       - name: Check the signature and start the Apple Silicon app
         run: |
