@@ -207,3 +207,42 @@ test('device: user rhythms are read and replaced as a whole file', async () => {
   assert.deepEqual(again.map((r) => decodeRecord(r).name), ['TRAP ATLANTA', 'TRAP SOUL']);
   assert.deepEqual(again[0], records[0]);
 });
+
+test('import: memories land in the chosen slot and user rhythms are matched by name', async () => {
+  const { scanImport, applyImport, planRhythms } = await import('../app/js/importer.js');
+  const { encodeRecord, decodeRecord } = await import('../app/js/rhythm-file.js');
+  const { PRESETS } = await import('../app/js/rhythm-presets.js');
+  const backend = demoBackend();
+  const dev = new Device(backend, (await backend.findVolumes())[0]);
+  await dev.scan();
+  // Package: memory 3 uses user rhythm 2 (TRAP DARK) of a package rhythm file in another order.
+  const pkgRhythms = [PRESETS[5], PRESETS[0], PRESETS[2]].map(encodeRecord);
+  const mem = rc.parseRc0(bytesToText(await backend.read(dev.dataPath('MEMORY003A.RC0'))));
+  rc.setNum(rc.section(mem, 'mem', 'RHYTHM'), 'A', 20);
+  rc.setNum(rc.section(mem, 'mem', 'RHYTHM'), 'B', 2);
+  rc.writeName(mem, 'PKG MEM');
+  const root = '/Volumes/RC-600 (DEMO)/ROLAND/PKG';
+  const { writeRhythmFile } = await import('../app/js/rhythm-file.js');
+  await backend.write(`${root}/DATA/MEMORY003A.RC0`, textToBytes(rc.serialize(mem, { count: 5 })));
+  await backend.write(`${root}/DATA/MEMORY003B.RC0`, textToBytes(rc.serialize(mem, { count: 2 }).replace('PKG', 'OLD')));
+  await backend.write(`${root}/DATA/RHYTHM.RC0`, writeRhythmFile(pkgRhythms));
+
+  const scan = await scanImport(backend, root);
+  assert.deepEqual(scan.memories.map((m) => [m.slot, m.name, m.userRhythm, m.rhythmName]), [[3, 'PKG MEM', 2, 'TRAP DARK']]);
+
+  // The looper has DRILL and ATLANTA: SOUL and DARK are added in package order, so DARK moves to index 3.
+  await dev.saveRhythms([PRESETS[1], PRESETS[0]].map(encodeRecord));
+  const plan = planRhythms(await dev.loadRhythms(), pkgRhythms);
+  assert.deepEqual(plan.names, ['TRAP DRILL', 'TRAP ATLANTA', 'TRAP SOUL', 'TRAP DARK']);
+
+  // Memory 7 has loops in the demo; import onto slot 7.
+  assert.ok(dev.memories[6].tracks.some(Boolean));
+  const out = await applyImport(dev, scan, [{ memory: scan.memories[0], to: 7 }]);
+  assert.deepEqual(out.addedRhythms, ['TRAP SOUL', 'TRAP DARK']);
+  const seven = await dev.loadMemory(7);
+  assert.equal(rc.readName(seven), 'PKG MEM');
+  assert.deepEqual(seven.blocks.map((b) => b.id), [6, 6, 6]);
+  assert.equal(rc.getNum(rc.section(seven, 'mem', 'RHYTHM'), 'B'), 3);
+  assert.deepEqual((await dev.trackFiles(7)).filter(Boolean), []);
+  assert.deepEqual((await dev.loadRhythms()).map((r) => decodeRecord(r).name), plan.names);
+});

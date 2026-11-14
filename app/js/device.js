@@ -182,6 +182,17 @@ export class Device {
 
   // ------------------------------------------------------------- manager
 
+  /** Move the loops of a memory slot to the app trash folder. */
+  async clearSlotWaves(slot) {
+    for (let t = 1; t <= 6; t++) {
+      const dir = rc.waveDir(slot, t);
+      if (!this.waveDirs.has(dir)) continue;
+      await this.backend.remove(join(this.root, 'WAVE', dir));
+      this.waveDirs.delete(dir);
+    }
+    this.waveCount = this.waveDirs.size;
+  }
+
   async copyWaves(from, to) {
     for (let t = 1; t <= 6; t++) {
       const dst = rc.waveDir(to, t);

@@ -310,3 +310,8 @@ canvas.wave { width: 100%; height: 46px; display: block; background: #08080a; bo
 /* rhythm editor: hit that is off the current grid */
 .step.part { background: repeating-linear-gradient(-45deg, var(--red-dim) 0 3px, var(--panel-3) 3px 6px); }
 .step.on { font-size: 9px; text-align: left; }
+
+/* Grid and flex children may shrink below their content, so long paths get an ellipsis
+   instead of pushing the layout wider than the window. */
+.header > *, .body > *, .grid > *, .two > *, .editor > *, .stack > *, .main { min-width: 0; }
+.table-scroll { overflow-x: auto; }

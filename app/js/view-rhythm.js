@@ -79,6 +79,12 @@ export async function writeRhythms() {
   }, () => `${ui.list.length} user rhythm(s) written to RHYTHM.RC0`);
 }
 
+export function forgetRhythms() {
+  stopRhythm();
+  ui.loadedFor = null;
+  ui.list = null;
+}
+
 S.pending.push({ label: 'user rhythms', dirty: rhythmDirty, write: writeRhythms, discard: () => { ui.loadedFor = null; ui.list = null; } });
 
 // ---------------------------------------------------------------- preview

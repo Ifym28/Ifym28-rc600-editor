@@ -58,10 +58,22 @@ Program Change so the looper follows, and the Overview has Start and Stop.
 | System | Global settings from `SYSTEM1/2.RC0`. |
 | Audio | Per track: waveform, play, import, export, copy, paste, delete. Play all with track levels. Bounce selected tracks to a file or to a track. |
 | Setlists | Ordered lists of memories with notes, stored in the app. |
-| Manager | Copy or swap memories, with or without loops. Backup and restore. |
+| Manager | Copy or swap memories, with or without loops. Import memories and user rhythms from another ROLAND folder, such as a setup package, into slots you choose. Backup and restore. |
 
 Edits stay in the app until you press **Write** (or Cmd+S). Changed values turn amber, and
 Memory Editor > Info lists every pending change.
+
+## Install a setup package
+
+1. Unzip the package (double-click the `.zip` in Finder).
+2. Connect the looper and its volume in the editor.
+3. Manager > **Import from folder…** and pick the unzipped folder.
+4. Tick the memories you want and choose a slot for each. The table shows what
+   each slot holds now and how many loops it has.
+5. Press **Import**. The editor first saves a settings backup, then adds the
+   package's user rhythms after yours (yours keep their place), points each
+   memory to its rhythm by name, moves the old loops of each target slot to the
+   trash folder, and writes the memories.
 
 ## How it writes, and how it keeps your data safe
 

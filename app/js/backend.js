@@ -216,6 +216,14 @@ export function demoBackend() {
       backups.push({ snap, wave: !!opts.wave });
       return { path: `demo backup #${backups.length} (kept in memory)`, wave: !!opts.wave };
     },
+    async pickImport() {
+      // The demo offers its own package: memories 3 and 7 of the demo volume and its rhythms.
+      const IMPORT = '/Volumes/RC-600 (DEMO)/ROLAND/IMPORT-DEMO';
+      for (const [from, to] of [['DATA/MEMORY003A.RC0', 'IMPORT-DEMO/DATA/MEMORY003A.RC0'], ['DATA/MEMORY007A.RC0', 'IMPORT-DEMO/DATA/MEMORY007A.RC0'], ['DATA/RHYTHM.RC0', 'IMPORT-DEMO/DATA/RHYTHM.RC0']]) {
+        ensure().set(to, ensure().get(from));
+      }
+      return { name: 'Demo package', root: IMPORT };
+    },
     async pickBackup() {
       if (!backups.length) throw new Error('No demo backup yet. Use Save Backup first.');
       return { path: String(backups.length - 1), wave: backups[backups.length - 1].wave };

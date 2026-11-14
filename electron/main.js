@@ -165,6 +165,18 @@ const handlers = {
     return { path: allow(root), wave: await exists(path.join(root, 'WAVE')) };
   },
 
+  async pickImport() {
+    const r = await dialog.showOpenDialog(win, {
+      title: 'Choose a folder to import from (for example the unzipped RC600-setup folder)',
+      properties: ['openDirectory'],
+      defaultPath: app.getPath('downloads'),
+    });
+    if (r.canceled || !r.filePaths[0]) return null;
+    const root = await resolveRoland(r.filePaths[0]);
+    if (!root) throw new Error('No ROLAND/DATA folder found there. Unzip the package first, then pick its folder.');
+    return { name: path.basename(path.dirname(root)) || path.basename(root), root: allow(root) };
+  },
+
   async restore(backupRoot, root) {
     const src = check(backupRoot);
     const dest = check(root);

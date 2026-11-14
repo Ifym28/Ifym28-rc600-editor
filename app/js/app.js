@@ -8,7 +8,8 @@ import {
 import { h, label, panel, btn, toast, confirm, pips, sectionPanel } from './ui.js';
 import { memoryView } from './view-memory.js';
 import { audioView, forgetAudio } from './view-audio.js';
-import { rhythmView, stopRhythm } from './view-rhythm.js';
+import { rhythmView, stopRhythm, forgetRhythms, rhythmDirty } from './view-rhythm.js';
+import { scanImport, applyImport } from './importer.js';
 import * as midiLink from './midi.js';
 import { midi } from './midi.js';
 import * as audio from './audio.js';
@@ -97,7 +98,7 @@ function memoryModule() {
       h('select', { disabled: !d, onchange: (e) => selectSlot(Number(e.target.value)) },
         d ? d.memories.map((m, i) => m && h('option', { value: i + 1, selected: i + 1 === S.slot }, `${two(i + 1)}: ${i + 1 === S.slot ? memName() : m.name}`)) : h('option', {}, '—'))),
     name,
-    h('div', { class: 'row', style: { marginTop: '8px' } },
+    h('div', { class: 'row wrap', style: { marginTop: '8px' } },
       btn('Write', writeMemory, 'small primary', { id: 'btn-write', disabled: !dirty(), title: 'Write this memory to the looper' }),
       btn('Revert', revertMemory, 'small', { id: 'btn-revert', disabled: !dirty() }),
       h('span', { class: 'grow' }),
@@ -221,6 +222,78 @@ function setlistsView() {
 }
 
 const mgr = { from: 1, to: 2, audio: true };
+const imp = { scan: null, picks: new Map() }; // slot in the package -> { on, to }
+
+async function chooseImport() {
+  const picked = await S.backend.pickImport().catch((e) => void toast(e.message, true));
+  if (!picked) return;
+  const scan = await run(() => scanImport(S.backend, picked.root));
+  if (!scan) return;
+  if (!scan.memories.length) return void toast('That folder has no memory files.', true);
+  imp.scan = { ...scan, name: picked.name };
+  imp.picks = new Map(scan.memories.map((m) => [m.slot, { on: true, to: m.slot }]));
+  S.render();
+}
+
+async function runImport() {
+  const d = S.device;
+  const picks = imp.scan.memories.filter((m) => imp.picks.get(m.slot).on).map((m) => ({ memory: m, to: imp.picks.get(m.slot).to }));
+  if (!picks.length) return void toast('Tick at least one memory.', true);
+  const targets = picks.map((p) => p.to);
+  if (new Set(targets).size !== targets.length) return void toast('Two memories go to the same slot.', true);
+  if (rhythmDirty()) return void toast('Write or revert your rhythm edits first (Rhythm view).', true);
+  if (!(await leaveCheck())) return;
+  const lines = picks.map((p) => {
+    const cur = d.memories[p.to - 1];
+    const loops = cur ? cur.tracks.filter(Boolean).length : 0;
+    return `${two(p.to)}: "${p.memory.name}" replaces "${cur ? memName(p.to) : 'empty'}"${loops ? `, ${loops} loop(s) go to the trash folder` : ''}`;
+  });
+  const ok = await confirm('Import memories', `${lines.join('\n')}\n\nA settings backup is saved first. New user rhythms are added after yours; yours are kept.`, 'Import', 'warn');
+  if (!ok) return;
+  await run(async () => {
+    audio.stopAll();
+    S.lastBackup = await S.backend.backup(d.root, { wave: false });
+    const out = await applyImport(d, imp.scan, picks);
+    forgetAudio();
+    forgetRhythms();
+    S.doc = await d.loadMemory(S.slot);
+    imp.scan = null;
+    for (const r of out.results) if (r.note) toast(`Memory ${r.to}: ${r.note}`, true);
+    return out;
+  }, (out) => `Imported ${out.results.length} memory(s)${out.addedRhythms.length ? ` and ${out.addedRhythms.length} user rhythm(s)` : ''}. Backup: ${S.lastBackup.path.split('/').pop()}`);
+}
+
+function importPanel() {
+  const d = S.device;
+  if (!imp.scan) {
+    return panel('flat', label('読込', 'IMPORT'),
+      h('div', { class: 'note', style: { marginBottom: '10px' } },
+        'Copy memories and user rhythms from another ROLAND folder onto this looper, for example the unzipped RC600-setup package. You choose the destination slot of each memory.'),
+      btn('Import from folder…', chooseImport, 'primary'));
+  }
+  const s = imp.scan;
+  return panel('hot', label('読込', `IMPORT FROM ${s.name.toUpperCase()}`),
+    h('div', { class: 'table-scroll' }, h('table', { class: 'grid-table' },
+      h('thead', {}, h('tr', {}, ['', 'In package', 'Name', 'BPM', 'Rhythm', 'To slot', 'Replaces'].map((x) => h('th', {}, x)))),
+      h('tbody', {}, s.memories.map((m) => {
+        const pick = imp.picks.get(m.slot);
+        const cur = d.memories[pick.to - 1];
+        const loops = cur ? cur.tracks.filter(Boolean).length : 0;
+        return h('tr', {},
+          h('td', {}, h('input', { type: 'checkbox', checked: pick.on, onchange: (e) => { pick.on = e.target.checked; S.render(); } })),
+          h('td', { class: 'red' }, two(m.slot)),
+          h('td', { style: { whiteSpace: 'pre' } }, m.name),
+          h('td', {}, m.tempo),
+          h('td', { class: 'dim' }, m.rhythmName ? `USER: ${m.rhythmName}` : m.userRhythm != null ? 'USER (missing)' : 'built-in'),
+          h('td', {}, h('select', { style: { width: '84px' }, onchange: (e) => { pick.to = Number(e.target.value); S.render(); } },
+            Array.from({ length: 99 }, (_, i) => h('option', { value: i + 1, selected: pick.to === i + 1 }, two(i + 1))))),
+          h('td', { class: loops ? 'amber' : 'dim' }, cur ? `${memName(pick.to) || '(no name)'}${loops ? ` · ${loops} loop(s)` : ''}` : 'empty'));
+      })))),
+    h('div', { class: 'note', style: { margin: '10px 0' } },
+      s.rhythms.length ? `The package has ${s.rhythms.length} user rhythm(s). Those not on the looper yet are added after yours, and each memory is pointed to its rhythm by name.` : 'The package has no user rhythms.'),
+    h('div', { class: 'row' }, btn('Import', runImport, 'warn'), btn('Cancel', () => { imp.scan = null; S.render(); }, 'ghost')));
+}
+
 function managerView() {
   const d = S.device;
   const slotSelect = (key) => h('select', { onchange: (e) => { mgr[key] = Number(e.target.value); S.render(); } },
@@ -260,6 +333,7 @@ function managerView() {
         h('div', { class: 'row wrap' }, btn('Save backup', saveBackup, 'go'), btn('Load backup', loadBackup),
           btn('Show in Finder', () => S.backend.reveal(`${d.root}/DATA`), 'ghost', { disabled: S.backend.kind === 'demo' })),
         h('div', { class: 'note', style: { marginTop: '10px' } }, S.lastBackup ? `Last: ${S.lastBackup.path}` : 'No backup in this session yet.'))),
+    importPanel(),
     panel('flat', label('一覧', 'MEMORY FILES'),
       h('div', { style: { maxHeight: '340px', overflow: 'auto' } },
         h('table', { class: 'grid-table' },
